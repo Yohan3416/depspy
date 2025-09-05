@@ -272,7 +272,7 @@ export function readFileSyncSafe(id: string) {
   try {
     code = readFileSync(filePath, { encoding: "utf-8" });
     // 统一不同系统的换行符
-    if(os.type() == "Windows_NT"){
+    if (os.type() == "Windows_NT") {
       code = code.replace(/\r\n/g, "\n");
     }
   } catch (e) {
@@ -445,6 +445,9 @@ export function normalizePath(path: string) {
 
 // 获取指定版本，指定文件的gitdiff信息
 export function getGitDiffByCommitHash(filePath: string, commitHash: string) {
+  if (filePath.includes("?")) {
+    filePath = filePath.split("?")[0];
+  }
   const diff = execSync(`git diff ${commitHash} -- ${filePath}`).toString();
   return diff;
 }

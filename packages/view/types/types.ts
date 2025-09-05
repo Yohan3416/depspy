@@ -108,9 +108,9 @@ export interface StaticStore {
   gitChangedNodes: Set<string>;
   importChangedNodes: Set<string>;
   fullscreen: boolean;
-  setFullscreen: (fullscreen: boolean) => void,
-  setGitChangedNodes: (gitChangedNodes: Set<string>) => void,
-  setImportChangedNodes: (importChangedNodes: Set<string>) => void,
+  setFullscreen: (fullscreen: boolean) => void;
+  setGitChangedNodes: (gitChangedNodes: Set<string>) => void;
+  setImportChangedNodes: (importChangedNodes: Set<string>) => void;
   setHighlightedNodeId: (nodeId: string) => void;
   setStaticRoot: (staticRoot: StaticTreeNode) => void;
   setStaticGraph: (staticRoot: Map<string, StaticGraphNode>) => void;
@@ -124,4 +124,3 @@ export interface OpenStore {
   setOldValue: (oldValue: string) => void;
   setNewValue: (newValue: string) => void;
 }
-

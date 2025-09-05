@@ -7,7 +7,7 @@ import { useEffect, useMemo } from "react";
 import { handleGraphNodes, renderTreeByGraphId } from "./utils";
 import { getStaticGraph } from "@/contexts/api";
 import DiffPannel from "@/components/DiffPanel";
-import { ConfigProvider, Splitter,theme as antTheme  } from "antd";
+import { ConfigProvider, Splitter, theme as antTheme } from "antd";
 import { Selected } from "./Sidebar/Selected";
 import { Global } from "./Sidebar/Global";
 import "./index.scss";
@@ -25,8 +25,10 @@ export default function StaticAnalyzePage() {
   } = useStaticStore();
   const theme = useStore((state) => state.theme);
   const selectNodeInfo = useMemo(() => {
-    const entryId = highlightedNodeId.split("-")[0];
-    return staticGraph?.get(entryId)
+    const arr = highlightedNodeId.split("-");
+    arr.pop();
+    const entryId = arr.join("-");
+    return staticGraph?.get(entryId);
   }, [highlightedNodeId, staticGraph]);
 
   async function initStaticGraph() {
@@ -59,11 +61,12 @@ export default function StaticAnalyzePage() {
   return (
     <ConfigProvider
       theme={{
-        algorithm: theme === "dark" ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
+        algorithm:
+          theme === "dark" ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
         components: {
           Splitter: {
-            splitBarDraggableSize:40,
-            splitBarSize:4
+            splitBarDraggableSize: 40,
+            splitBarSize: 4,
           },
         },
       }}
@@ -74,29 +77,28 @@ export default function StaticAnalyzePage() {
             <Global />
           </Splitter.Panel>
           <Splitter.Panel>
-            <Splitter layout="vertical" >
+            <Splitter layout="vertical">
               <Splitter.Panel defaultSize="80%">
                 <div className="w-full h-full overflow-y-auto scroll-bar bg-bgLayout">
-                  {
-                    fullscreen && selectNodeInfo.curCode ? (
-                      <div className="h-">
-                        <DiffPannel
-                          preCode={selectNodeInfo.preCode}
-                          curCode={selectNodeInfo.curCode}
-                          splitView
-                          hideLineNumbers={false}
-                        />
+                  {fullscreen && selectNodeInfo.curCode ? (
+                    <div className="h-">
+                      <DiffPannel
+                        preCode={selectNodeInfo.preCode}
+                        curCode={selectNodeInfo.curCode}
+                        splitView
+                        hideLineNumbers={false}
+                      />
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <div className="absolute left-0 right-0 z-1">
+                        <StaticTree />
                       </div>
-                    ) : (
-                      <div className="relative">
-                        <div className="absolute left-0 right-0 z-1">
-                          <StaticTree />
-                        </div>
-                        <div className="absolute">
-                          <GridBackground></GridBackground>
-                        </div>
-                      </div>)
-                  }
+                      <div className="absolute">
+                        <GridBackground></GridBackground>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </Splitter.Panel>
               <Splitter.Panel collapsible>
