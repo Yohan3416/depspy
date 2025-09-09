@@ -56,7 +56,7 @@ export type GetModuleInfo = (importId: string) => ModuleInfo;
 
 export interface PluginDepSpyConfig {
   // 项目的入口，默认为index.html
-  entry?: string;
+  entry?: string | string[];
   // 忽略的文件路径，正则用test，字符串用includes
   ignores?: (string | RegExp)[];
   // 对比版本的commit hash

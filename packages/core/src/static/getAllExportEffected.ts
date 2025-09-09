@@ -59,12 +59,21 @@ export default async function getAllExportEffect(
       Object.values(options).reduce((pre, cur) => pre + cur, ""),
     );
   });
-  return await _getAllExportEffect(
-    options,
-    new Set(),
-    sourceToImportIdMap,
-    getModuleInfo,
+  const entries = Array.isArray(options.entry)
+    ? options.entry
+    : [options.entry];
+  // 多入口：并行计算，每个入口共享缓存
+  await Promise.all(
+    entries.map((e) =>
+      _getAllExportEffect(
+        { ...options, entry: e },
+        new Set(),
+        sourceToImportIdMap,
+        getModuleInfo,
+      ),
+    ),
   );
+  return importIdToExportEffected;
 }
 
 // 获取代码中有哪些导出收到了改动的影响（直接或间接）
@@ -78,7 +87,9 @@ async function _getAllExportEffect(
   // 获取moduleInfo的函数
   getModuleInfo: (importId: string) => ModuleInfo,
 ) {
-  const { entry, ignores = [], commitHash = "HEAD" } = options;
+  const { ignores = [], commitHash = "HEAD" } = options;
+  // 该内部函数只在单入口场景被调用（外层已拆分多入口）
+  const entry = options.entry as string;
   // 排除路径不存在的情况
   if (!entry) {
     return importIdToExportEffected;
@@ -97,7 +108,14 @@ async function _getAllExportEffect(
   const isCommonJs = isCommonJsById(entry);
 
   // 获取当前文件的信息
-  const currentInfo = getModuleInfo(entry);
+  const currentInfo =
+    getModuleInfo(entry) ||
+    ({
+      importedIds: [],
+      dynamicallyImportedIds: [],
+      removedExports: [],
+      renderedExports: [],
+    } as ModuleInfo);
 
   /* 返回空节点，只做展示
     1. 用户配置的忽略文件

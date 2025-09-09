@@ -35,17 +35,45 @@ export function vitePluginDepSpy(
       if (process.env[DEP_SPY_SUB_START]) {
         return;
       }
-      //  设置入口绝对地址，默认是index.html
-      options.entry = options?.entry
-        ? normalizePath(options.entry)
-        : normalizePath(path.join(config.root, "index.html"));
+      //  设置入口绝对地址，默认是index.html；支持数组
+      const normalizeEntry = (e: string) =>
+        normalizePath(path.isAbsolute(e) ? e : path.join(config.root, e));
+      if (!options?.entry) {
+        options.entry = normalizePath(path.join(config.root, "index.html"));
+      }
+      const entries = Array.isArray(options.entry)
+        ? Array.from(new Set(options.entry.map(normalizeEntry)))
+        : [normalizeEntry(options.entry)];
+      options.entry = entries;
+
+      // 合并到 rollupOptions.input（若用户未配置则填充；若已配置则合并去重）
+      const input = (config.build?.rollupOptions as { input?: unknown })?.input;
+      const toArray = (v: unknown): string[] => {
+        if (!v) return [];
+        if (typeof v === "string") return [v];
+        if (Array.isArray(v)) return v as string[];
+        if (typeof v === "object")
+          return Object.values(v as Record<string, string>);
+        return [];
+      };
+      const merged = Array.from(new Set([...entries, ...toArray(input)]));
+      const _build = (config.build || ({} as unknown)) as {
+        rollupOptions?: { input?: unknown };
+      };
+      const _rollupOptions = (_build.rollupOptions || ({} as unknown)) as {
+        input?: unknown;
+      };
+      _rollupOptions.input = merged;
+      _build.rollupOptions = _rollupOptions;
+      // @ts-expect-error update resolved config for downstream plugins; vite doesn't type this as mutable
+      config.build = _build;
 
       // 注入resolveId，保证第一个执行，不会被其他插件阶段
       /* 虽然vite不建议在这里调整插件，但是没有强行限制
          1. 只是收集引入和真实路径的关系，不会影响其他插件运行
          2. 避免被其他强行加入的插件提前拦截影响，比如：vite-plugin-uni
       **/
-      /* @ts-ignore */
+      /* @ts-expect-error ensure earliest resolve to record source-import map */
       config.plugins?.unshift({
         name: "vite-plugin-dep-spy-main-resolve",
         resolveId(id: string, importer: string) {
@@ -75,8 +103,17 @@ export function vitePluginDepSpy(
         // 当前文件的后缀
         const ext = path.extname(importId);
         // 导入信息
-        const { importedIds, dynamicallyImportedIds, exportedBindings } =
-          this.getModuleInfo(importId);
+        const moduleInfo = this.getModuleInfo(importId);
+        if (!moduleInfo) {
+          throw new Error(`please check if ${importId} is correctly parsed`);
+        }
+        const importedIds = moduleInfo.importedIds;
+        const dynamicallyImportedIds = moduleInfo.dynamicallyImportedIds;
+        const exportedBindings = (
+          moduleInfo as unknown as {
+            exportedBindings?: Record<string, string[]>;
+          }
+        ).exportedBindings;
         // 导出信息
         const { removedExports = [], renderedExports = [] } =
           importIdToExports.get(importId) || {};

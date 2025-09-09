@@ -33,4 +33,4 @@ export const DEP_SPY_WINDOW_VAR = "__DEP_SPY_STATIC_TREE__";
 // 引入副作用的自定义变量名
 export const SIDE_EFFECT_NAME = "";
 // 全量引入的变量名
-export const ALL_EXPORT_NAME = "*"
+export const ALL_EXPORT_NAME = "*";

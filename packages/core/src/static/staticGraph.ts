@@ -25,13 +25,24 @@ export class StaticGraph {
   ) {}
 
   /** 生成邻接链表表示图 */
-  async generateGraph(importId: string = this.options.entry) {
+  async generateGraph() {
     this.allExportEffected = await getAllExportEffect(
       this.options,
       this.sourceToImportIdMap,
       this.getModuleInfo,
     );
-    return this.generateNode(importId);
+    if (Array.isArray(this.options.entry)) {
+      (this.options.entry as string[]).forEach((root) => {
+        if (root) {
+          this.generateNode(root);
+        }
+      });
+      return this.graph;
+    }
+    if (this.options.entry) {
+      return this.generateNode(this.options.entry as string);
+    }
+    return this.graph;
   }
   private generateNode(importId: string) {
     // 相对路径
