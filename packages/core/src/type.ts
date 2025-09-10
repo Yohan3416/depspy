@@ -61,6 +61,8 @@ export interface PluginDepSpyConfig {
   ignores?: (string | RegExp)[];
   // 对比版本的commit hash
   commitHash?: string;
+  // 是否在构建内部依赖图的时候忽略第三方依赖
+  ignoreThirdParty?: boolean;
 }
 
 interface _StaticGraphNode extends ExportEffectedNode {

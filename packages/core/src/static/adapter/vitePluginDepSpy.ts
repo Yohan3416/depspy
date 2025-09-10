@@ -11,7 +11,7 @@ import { GetModuleInfo, PluginDepSpyConfig } from "../../type";
 import { StaticGraph } from "../staticGraph";
 
 export function vitePluginDepSpy(
-  options: PluginDepSpyConfig = {},
+  options: PluginDepSpyConfig = { ignoreThirdParty: true },
 ): PluginOption {
   //只能通过ds命令运行;
   if (!process.env[DEP_SPY_START]) {
@@ -67,6 +67,37 @@ export function vitePluginDepSpy(
       _build.rollupOptions = _rollupOptions;
       // @ts-expect-error update resolved config for downstream plugins; vite doesn't type this as mutable
       config.build = _build;
+
+      // 设置 node_modules 为 external，避免额外构建第三方依赖
+      if (options.ignoreThirdParty) {
+        const external =
+          (config.build.rollupOptions as { external?: unknown }).external || [];
+        const externalArray = Array.isArray(external) ? external : [external];
+        const nodeModulesExternal = (id: string) => {
+          return (
+            id.includes("node_modules") ||
+            externalArray.some((ext: unknown) =>
+              typeof ext === "function"
+                ? (ext as (id: string) => boolean)(id)
+                : typeof ext === "string"
+                  ? id.includes(ext)
+                  : ext instanceof RegExp
+                    ? ext.test(id)
+                    : false,
+            )
+          );
+        };
+        (config.build.rollupOptions as { external?: unknown }).external =
+          nodeModulesExternal;
+
+        // 取消 manualChunks，避免与 external 设置冲突
+        const rollupOptions = config.build.rollupOptions as {
+          output?: { manualChunks?: unknown };
+        };
+        if (rollupOptions.output) {
+          rollupOptions.output.manualChunks = undefined;
+        }
+      }
 
       // 注入resolveId，保证第一个执行，不会被其他插件阶段
       /* 虽然vite不建议在这里调整插件，但是没有强行限制

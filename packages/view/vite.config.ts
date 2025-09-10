@@ -20,6 +20,10 @@ export default defineConfig(({ mode }) => {
           manualChunks: {
             g6: ["@antv/g6"],
           },
+          input: [
+            path.resolve(__dirname, "index2.html"),
+            path.resolve(__dirname, "index.html"),
+          ],
         },
       },
       sourcemap: true,
@@ -28,6 +32,11 @@ export default defineConfig(({ mode }) => {
     plugins: [
       vitePluginDepSpy({
         commitHash: "8ead6fa181ba634f601f5b2ea74e45705099132f",
+        entry: [
+          path.resolve(__dirname, "index2.html"),
+          path.resolve(__dirname, "index.html"),
+        ],
+        ignoreThirdParty: false,
       }),
       reactPlugin(),
       svgr({ svgrOptions: { icon: true } }),
