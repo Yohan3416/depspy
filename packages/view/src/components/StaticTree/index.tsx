@@ -1,24 +1,34 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef } from "react";
 import * as G6 from "@antv/g6";
 import { useStaticStore, useStore } from "@/contexts";
 import { textOverflow } from "../../utils/textOverflow";
 import { shallow } from "zustand/shallow";
 import { State, COLOR } from "./constant";
-import { deepClone } from "@/utils/deepClone";
-import { extractFileName } from "@/pages/StaticAnalyzePage/utils";
-import { StaticTreeNode } from "~/types";
+import {
+  extractFileName,
+  getNextLevel,
+  getEntryIdFromTreeId,
+  renderNextLevel,
+} from "@/pages/StaticAnalyzePage/utils";
 
 export default function StaticTree() {
-  const { staticRoot, setHighlightedNodeId, highlightedNodeId } =
-    useStaticStore(
-      (state) => ({
-        staticRoot: state.staticRoot,
-        setStaticRoot: state.setStaticRoot,
-        highlightedNodeId: state.highlightedNodeId,
-        setHighlightedNodeId: state.setHighlightedNodeId,
-      }),
-      shallow,
-    );
+  const {
+    staticRoot,
+    staticRootVersion,
+    setHighlightedNodeId,
+    highlightedNodeId,
+    activeTab,
+  } = useStaticStore(
+    (state) => ({
+      staticRoot: state.staticRoot,
+      staticRootVersion: state.staticRootVersion,
+      setStaticRoot: state.setStaticRoot,
+      highlightedNodeId: state.highlightedNodeId,
+      setHighlightedNodeId: state.setHighlightedNodeId,
+      activeTab: state.activeTab,
+    }),
+    shallow,
+  );
   const { theme } = useStore(
     (state) => ({
       theme: state.theme,
@@ -26,14 +36,15 @@ export default function StaticTree() {
     shallow,
   );
   const graphRef = useRef<G6.TreeGraph>();
-  const [cloneData, setCloneData] = useState<StaticTreeNode | undefined>();
-  const [circleMap, setCircleMap] = useState(new Map());
+  const lastMatrixRef = useRef<number[] | null>(null);
   const highlightedNodeIdRef = useRef(highlightedNodeId);
   const containerRef = useRef<HTMLDivElement>();
 
   useEffect(() => {
     if (!graphRef.current) return;
-    const prevMatrix = graphRef.current.getGroup().getMatrix()?.slice?.();
+    const prevMatrix =
+      lastMatrixRef.current ||
+      graphRef.current.getGroup().getMatrix()?.slice?.();
 
     G6RegisterNode();
     // 生成新的nodeStateStyles配置
@@ -64,22 +75,10 @@ export default function StaticTree() {
       });
     });
     // 使用 changeData 以更新自定义节点/边的颜色
-    graphRef.current.changeData(cloneData);
-
-    circleMap.forEach((k, v) => {
-      if (graphRef.current.findById(v) && graphRef.current.findById(k)) {
-        graphRef.current.addItem("edge", {
-          source: k,
-          target: v,
-          type: "circle-line",
-        });
-      }
-    });
+    graphRef.current.changeData(staticRoot);
 
     // 恢复视图矩阵，保持位置与缩放
-    if (prevMatrix) {
-      graphRef.current.getGroup().setMatrix(prevMatrix);
-    }
+    if (prevMatrix) graphRef.current.getGroup().setMatrix(prevMatrix);
     graphRef.current.setAutoPaint(true);
     graphRef.current.paint();
   }, [theme]);
@@ -118,8 +117,10 @@ export default function StaticTree() {
           });
           const tbox = text.getBBox();
           const rbox = rect.getBBox();
-          const hasChildren =
-            Array.isArray(cfg.children) && cfg.children.length > 0;
+          // const hasChildren =
+          //   Array.isArray(cfg.children) && cfg.children.length > 0;
+          const id = getEntryIdFromTreeId(cfg.id as string);
+          const hasChildren = getNextLevel(id, activeTab === "git").size > 0;
           text.attr({
             x: (rbox.width - tbox.width) / 2,
             y: (rbox.height + tbox.height) / 2,
@@ -234,129 +235,21 @@ export default function StaticTree() {
       graphRef.current.setItemState(edge, State.HIGHLIGHTE, false);
       graphRef.current.refreshItem(edge);
     });
-
-    highlightNodesSequentially();
-  }, [highlightedNodeId]);
-
-  // 用于展开节点
-  const expandNode = useCallback(
-    (item: G6.Node, flag: boolean) => {
-      if (!graphRef.current) return;
-      const model = item.getModel();
-      if (!model.collapsed) return;
-      const prevMatrix = graphRef.current.getGroup().getMatrix()?.slice?.();
-
-      graphRef.current.setAutoPaint(false);
-      graphRef.current.updateItem(item, {
-        collapsed: !flag,
-      });
-      // 重新布局，无需全量 changeData
-      graphRef.current.layout();
-      circleMap.forEach((k, v) => {
-        if (graphRef.current.findById(v) && graphRef.current.findById(k)) {
-          graphRef.current.addItem("edge", {
-            source: k,
-            target: v,
-            type: "circle-line",
-          });
-        }
-      });
-      // 恢复视图矩阵，保持位置与缩放
-      if (prevMatrix) {
-        graphRef.current.getGroup().setMatrix(prevMatrix);
-      }
-      graphRef.current.setAutoPaint(true);
-      graphRef.current.paint();
-    },
-    [graphRef, cloneData, circleMap],
-  );
-
-  const expandNodeSequentially = useCallback(
-    async (id: string) => {
-      const rawItem = graphRef.current.findById(id) as G6.Node;
-
-      // 处理节点展开逻辑
-      if (rawItem) {
-        //如果图里能找到节点，则展开节点并等待渲染完成
-        expandNode(rawItem, true);
-        // 等待一帧确保渲染完成
-        // await new Promise((resolve) => requestAnimationFrame(resolve));
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      } else {
-        // 如果找不到节点，则遍历数据查找路径，展开路径节点
-        let path: string[] = [];
-        G6.Util.traverseTree(cloneData, (node) => {
-          if (node.id === id) {
-            path = [...node.path];
-            return false;
-          }
-          return true;
-        });
-        const updatedIds = new Set<string>();
-        if (path.length) {
-          for (const pid of path) {
-            if (!updatedIds.has(pid)) {
-              const rawPathItem = graphRef.current.findById(pid) as G6.Node;
-              if (rawPathItem) {
-                expandNode(rawPathItem, true);
-                // 每个路径节点展开后都等待渲染
-                // await new Promise((resolve) => requestAnimationFrame(resolve));
-                await new Promise((resolve) => setTimeout(resolve, 0));
-              }
-              updatedIds.add(pid);
-            }
-          }
-        }
-      }
-      // 额外等待确保高亮效果渲染
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-    },
-    [graphRef.current, expandNode, highlightedNodeId],
-  );
-
-  const highlightNodesSequentially = useCallback(async () => {
-    await expandNodeSequentially(highlightedNodeId);
-    // 处理高亮逻辑
-    const item = graphRef.current.findById(highlightedNodeId) as G6.Node;
-    if (!item) return;
-
-    const relatedEdges = item.getEdges() || [];
-    graphRef.current.setItemState(item, State.HIGHLIGHTE, true);
-    graphRef.current.refreshItem(item);
-
-    relatedEdges.forEach((edge) => {
-      const {
-        _cfg: { currentShape },
-      } = edge;
-      if (currentShape === "custom-polyline") {
+    //高亮节点
+    const node = graphRef.current.findById(highlightedNodeId);
+    const relatedEdges = (node as G6.Node).getEdges();
+    if (node) {
+      graphRef.current.setItemState(node, State.HIGHLIGHTE, true);
+      graphRef.current.refreshItem(node);
+      relatedEdges.forEach((edge) => {
         graphRef.current.setItemState(edge, State.HIGHLIGHTE, true);
         graphRef.current.refreshItem(edge);
-      } else {
-        //判断当前节点是否是起点
-        if (edge.getSource().getModel().id === item.getModel().id) {
-          graphRef.current.setItemState(edge, State.HIGHLIGHTE, true);
-          graphRef.current.refreshItem(edge);
-        }
-      }
-    });
-  }, [highlightedNodeId, graphRef.current, expandNodeSequentially]);
+      });
+    }
+  }, [highlightedNodeId]);
 
   useEffect(() => {
-    if (!staticRoot) return;
-    const newData = deepClone(staticRoot);
-    const map = new Map();
-    //转换为g6的数据格式
-    G6.Util.traverseTree(newData, (subTree) => {
-      //初始化折叠状态
-      subTree.collapsed = subTree.paths.length >= 2 ? true : false;
-      return true;
-    });
-    setCloneData(newData as StaticTreeNode);
-    setCircleMap(map);
-  }, [staticRoot]);
-
-  useEffect(() => {
-    if (!cloneData || !containerRef.current) return;
+    if (!staticRoot || !containerRef.current) return;
     // hover
     const tooltip = new G6.Tooltip({
       offsetX: 10,
@@ -383,48 +276,7 @@ export default function StaticTree() {
       // fitView: true,
       animate: false,
       modes: {
-        default: [
-          {
-            type: "collapse-expand",
-            onChange: function onChange(item, collapsed) {
-              const prevMatrix = graph.getGroup().getMatrix()?.slice?.();
-              graph.setAutoPaint(false);
-              const data = item.get("model");
-              graph.updateItem(item, {
-                collapsed,
-              });
-              data.collapsed = collapsed;
-              // 重新布局
-              graph.layout();
-              // circle 边批量维护（沿用原逻辑）
-              circleMap.forEach((k, v) => {
-                if (graph.findById(v) && graph.findById(k)) {
-                  graph.addItem("edge", {
-                    source: k,
-                    target: v,
-                    type: "circle-line",
-                  });
-                }
-              });
-              // 恢复视图矩阵，保持位置与缩放
-              if (prevMatrix) {
-                graph.getGroup().setMatrix(prevMatrix);
-              }
-              graph.setAutoPaint(true);
-              graph.paint();
-              return true;
-            },
-            shouldBegin(e) {
-              // 仅响应我们自定义的 collapse-icon
-              if (e.target && e.target.cfg.name === "collapse-icon")
-                return true;
-
-              return false;
-            },
-          },
-          "drag-canvas",
-          "zoom-canvas",
-        ],
+        default: ["drag-canvas", "zoom-canvas"],
       },
       nodeStateStyles: {
         highlight: {
@@ -469,26 +321,51 @@ export default function StaticTree() {
     });
 
     graphRef.current = graph;
-    graph.data(cloneData);
+    graph.data(staticRoot);
     graph.render();
-    circleMap.forEach((k, v) => {
-      if (graph.findById(v) && graph.findById(k)) {
-        graph.addItem("edge", {
-          source: k,
-          target: v,
-          type: "circle-line",
-        });
-      }
-    });
-    // graph.fitView();
-    //居中
-    graph.translate(graph.getWidth() / 2, graph.getHeight() / 2);
+    // 若已有历史矩阵，则优先恢复；否则首次居中
+    if (lastMatrixRef.current) {
+      graph.getGroup().setMatrix(lastMatrixRef.current);
+    } else {
+      // graph.fitView();
+      graph.translate(graph.getWidth() / 2, graph.getHeight() / 2);
+      lastMatrixRef.current = graph.getGroup().getMatrix()?.slice?.() || null;
+    }
+    graph.paint();
+
+    // 监听视口相关事件，实时记录矩阵
+    const saveMatrix = () => {
+      const m = graph.getGroup().getMatrix();
+      if (m) lastMatrixRef.current = m.slice();
+    };
+    graph.on("viewportchange", saveMatrix as unknown as () => void);
+    graph.on("afterzoom", saveMatrix as unknown as () => void);
+    graph.on("dragend", saveMatrix as unknown as () => void);
 
     //注册事件 --> 折叠与展开 高亮节点
     graph.on("node:click", (e) => {
       if (e.target.cfg.name === "collapse-icon") {
-        // 折叠/展开交给 collapse-expand.onChange 处理，避免重复
         clearHighlight();
+        const prevMatrix =
+          lastMatrixRef.current || graph.getGroup().getMatrix()?.slice?.();
+        const item = e.item as G6.Node;
+        const data = item.get("model") as { id: string; collapsed?: boolean };
+        const collapsed = !data.collapsed;
+        // 展开前拉取下一层
+        if (!collapsed) {
+          const reverse = activeTab === "git";
+          renderNextLevel(data.id as string, reverse);
+        }
+        graph.setAutoPaint(false);
+        graph.updateItem(item, { collapsed });
+        (item.get("model") as { collapsed?: boolean }).collapsed = collapsed;
+        graph.layout();
+        if (prevMatrix) graph.getGroup().setMatrix(prevMatrix);
+        // 更新缓存矩阵
+        const m = graph.getGroup().getMatrix();
+        if (m) lastMatrixRef.current = m.slice();
+        graph.setAutoPaint(true);
+        graph.paint();
         return;
       } else {
         e.stopPropagation();
@@ -500,7 +377,7 @@ export default function StaticTree() {
       graph.destroy();
       graphRef.current = null;
     };
-  }, [cloneData]);
+  }, [staticRootVersion]);
 
   const clearHighlight = () => {
     setHighlightedNodeId("");

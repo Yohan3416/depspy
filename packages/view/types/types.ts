@@ -60,6 +60,7 @@ export interface StaticTreeNode extends StaticGraphNode {
   children: StaticTreeNode[];
   // 从根节点到当前节点的路径数组
   paths: string[];
+  collapsed: boolean;
 }
 
 export interface generateGraphRes {
@@ -104,15 +105,19 @@ export interface StaticStore {
   staticRoot: StaticTreeNode;
   staticGraph: Map<string, StaticGraphNode>;
   staticRootLoading: boolean;
+  staticRootVersion: number;
   highlightedNodeId: string;
   gitChangedNodes: Set<string>;
   importChangedNodes: Set<string>;
   fullscreen: boolean;
+  activeTab: "git" | "import";
+  setActiveTab: (activeTab: "git" | "import") => void;
   setFullscreen: (fullscreen: boolean) => void;
   setGitChangedNodes: (gitChangedNodes: Set<string>) => void;
   setImportChangedNodes: (importChangedNodes: Set<string>) => void;
   setHighlightedNodeId: (nodeId: string) => void;
   setStaticRoot: (staticRoot: StaticTreeNode) => void;
+  bumpStaticRootVersion: () => void;
   setStaticGraph: (staticRoot: Map<string, StaticGraphNode>) => void;
   setStaticRootLoading: (staticRootLoading: boolean) => void;
 }

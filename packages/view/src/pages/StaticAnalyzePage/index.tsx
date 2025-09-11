@@ -40,7 +40,7 @@ export default function StaticAnalyzePage() {
     setImportChangedNodes(importChangeSet);
     // 默认渲染第一个节点,等待数据就绪再渲染
     setTimeout(() => {
-      renderTreeByGraphId(gitChangeSet.keys().next().value, undefined, true);
+      renderTreeByGraphId(gitChangeSet.keys().next().value, true);
     }, 0);
   }
 
@@ -51,7 +51,7 @@ export default function StaticAnalyzePage() {
   useEffect(() => {
     if (!staticRoot) return;
     if (staticRoot) {
-      renderTreeByGraphId(staticRoot.relativeId);
+      renderTreeByGraphId(staticRoot.relativeId, false);
     }
   }, [staticGraph]);
 

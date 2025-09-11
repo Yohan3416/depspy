@@ -56,7 +56,7 @@ export const useStore = createWithEqualityFn<Store>()(
     searchNode,
     setCollapse: (collapse) => set({ collapse }),
     setTheme: (theme: string) => {
-      const newTheme = theme === "light"? "dark" : "light";
+      const newTheme = theme === "light" ? "dark" : "light";
       localStorage.setItem("theme", newTheme);
       set({ theme: newTheme });
     },
@@ -100,10 +100,13 @@ export const useStaticStore = createWithEqualityFn<StaticStore>()(
     staticRootLoading: true,
     staticGraph: null,
     staticRoot: null,
+    staticRootVersion: 0,
     highlightedNodeId: "",
     gitChangedNodes: new Set(),
     importChangedNodes: new Set(),
     fullscreen: false,
+    activeTab: "git",
+    setActiveTab: (activeTab: "git" | "import") => set({ activeTab }),
     setFullscreen: (fullscreen: boolean) => set({ fullscreen }),
     setGitChangedNodes: (gitChangedNodes: Set<string>) =>
       set({ gitChangedNodes }),
@@ -113,19 +116,25 @@ export const useStaticStore = createWithEqualityFn<StaticStore>()(
       set({ highlightedNodeId }),
     setStaticGraph: (staticGraph: Map<string, StaticGraphNode>) =>
       set({ staticGraph }),
-    setStaticRoot: (staticRoot: StaticTreeNode) => set({ staticRoot }),
+    setStaticRoot: (staticRoot: StaticTreeNode) =>
+      set((s) => ({ staticRoot, staticRootVersion: s.staticRootVersion + 1 })),
+    bumpStaticRootVersion: () =>
+      set((s) => ({ staticRootVersion: s.staticRootVersion + 1 })),
     setStaticRootLoading: (staticRootLoading: boolean) =>
       set({ staticRootLoading }),
   })),
   shallow,
 );
-useStaticStore.subscribe((state) => state.staticRoot, (staticRoot) => {
-  setTimeout(() => {
-    useStaticStore.setState({
-      highlightedNodeId: staticRoot.id
-    })
-  }, 50)
-})
+useStaticStore.subscribe(
+  (state) => state.staticRoot,
+  (staticRoot) => {
+    setTimeout(() => {
+      useStaticStore.setState({
+        highlightedNodeId: staticRoot.id,
+      });
+    }, 50);
+  },
+);
 if (import.meta.env.VITE_BUILD_MODE != "online") {
   linkContext(useStore);
 }

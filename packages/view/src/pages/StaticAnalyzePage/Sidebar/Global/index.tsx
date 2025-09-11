@@ -1,20 +1,26 @@
 import { useStaticStore } from "@/contexts";
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useCallback } from "react";
 import { shallow } from "zustand/shallow";
 import { renderTreeByGraphId } from "../../utils";
 import useLanguage from "@/i18n/hooks/useLanguage";
 import { Tree, ConfigProvider, Segmented } from "antd";
-import Icon, { CaretDownOutlined, FileOutlined, FolderOpenOutlined, FolderOutlined } from '@ant-design/icons';
+import Icon, {
+  CaretDownOutlined,
+  FileOutlined,
+  FolderOpenOutlined,
+  FolderOutlined,
+} from "@ant-design/icons";
 import { icons } from "./icons";
 
 export const Global = () => {
-  const [activeTab, setActiveTab] = useState<"git" | "import">("git");
-  const { gitChangedNodes, importChangedNodes } =
+  // const [activeTab, setActiveTab] = useState<"git" | "import">("git");
+  const { gitChangedNodes, importChangedNodes, activeTab, setActiveTab } =
     useStaticStore(
       (state) => ({
-        staticGraph: state.staticGraph,
         gitChangedNodes: state.gitChangedNodes,
         importChangedNodes: state.importChangedNodes,
+        activeTab: state.activeTab,
+        setActiveTab: state.setActiveTab,
       }),
       shallow,
     );
@@ -50,12 +56,16 @@ export const Global = () => {
               isLeaf: isFile,
               path: currentPath,
               selectable: isFile,
-              icon: ({expanded})=>{
-                if(isFile){
-                  const ext= path.split(".").pop();
-                  return icons[ext]? <Icon component={icons[ext]} />:<FileOutlined />;
+              icon: ({ expanded }) => {
+                if (isFile) {
+                  const ext = path.split(".").pop();
+                  return icons[ext] ? (
+                    <Icon component={icons[ext]} />
+                  ) : (
+                    <FileOutlined />
+                  );
                 }
-                return expanded? <FolderOpenOutlined /> : <FolderOutlined />
+                return expanded ? <FolderOpenOutlined /> : <FolderOutlined />;
               },
             };
             if (isFile) {
@@ -76,9 +86,9 @@ export const Global = () => {
   const handleFileListClick = useCallback(
     (path: string) => {
       if (activeTab === "git") {
-        renderTreeByGraphId(path, undefined, true);
+        renderTreeByGraphId(path, true);
       } else if (activeTab === "import") {
-        renderTreeByGraphId(path);
+        renderTreeByGraphId(path, false);
       }
     },
     [gitChangedNodes, importChangedNodes, activeTab],
@@ -91,28 +101,32 @@ export const Global = () => {
           components: {
             Tree: {
               indentSize: 15,
-              nodeHoverColor: "#7550f1"
+              nodeHoverColor: "#7550f1",
             },
             Segmented: {
               itemSelectedBg: "#7550f1",
               itemHoverColor: "none",
-              itemSelectedColor: "none"
-            }
+              itemSelectedColor: "none",
+            },
           },
-        }}>
+        }}
+      >
         <header className="flex justify-center gap-2 pt-4 border-b">
           <Segmented<string>
             className="bg-bgLayout text-text"
-            options={[{
-              label: t("static.gitChanged"),
-              value: "git"
-            }, {
-              label: t("static.importChanged"),
-              value: "import"
-            }]}
+            options={[
+              {
+                label: t("static.gitChanged"),
+                value: "git",
+              },
+              {
+                label: t("static.importChanged"),
+                value: "import",
+              },
+            ]}
             size="large"
             onChange={(value) => {
-              setActiveTab(value as "git" | "import")
+              setActiveTab(value as "git" | "import");
             }}
           />
         </header>
@@ -121,7 +135,10 @@ export const Global = () => {
           style={{ scrollbarWidth: "none" }}
         >
           {activeTab === "git" && (
-            <div className="space-y-2" style={{ height: "calc(100vh - 200px)" }}>
+            <div
+              className="space-y-2"
+              style={{ height: "calc(100vh - 200px)" }}
+            >
               {gitChangedNodes.size === 0 ? (
                 <div className="text-gray-400 p-4 text-center">
                   {/* 暂无受影响文件 */}
@@ -138,8 +155,7 @@ export const Global = () => {
                   onSelect={(_, { node }) => {
                     handleFileListClick(node["path"]);
                   }}
-                >
-                </Tree>
+                ></Tree>
               )}
             </div>
           )}
@@ -162,8 +178,7 @@ export const Global = () => {
                   onSelect={(_, { node }) => {
                     handleFileListClick(node["path"]);
                   }}
-                >
-                </Tree>
+                ></Tree>
               )}
             </div>
           )}
