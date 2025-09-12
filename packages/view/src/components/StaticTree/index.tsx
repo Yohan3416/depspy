@@ -369,8 +369,28 @@ export default function StaticTree() {
         return;
       } else {
         e.stopPropagation();
-        clearHighlight();
-        setHighlightedNodeId(e.item._cfg.id);
+        // 先展开
+        const prevMatrix =
+          lastMatrixRef.current || graph.getGroup().getMatrix()?.slice?.();
+        const item = e.item as G6.Node;
+        const data = item.get("model") as { id: string; collapsed?: boolean };
+        const collapsed = false;
+        const reverse = activeTab === "git";
+        renderNextLevel(data.id as string, reverse);
+        graph.setAutoPaint(false);
+        graph.updateItem(item, { collapsed });
+        (item.get("model") as { collapsed?: boolean }).collapsed = collapsed;
+        graph.layout();
+        if (prevMatrix) graph.getGroup().setMatrix(prevMatrix);
+        // 更新缓存矩阵
+        const m = graph.getGroup().getMatrix();
+        if (m) lastMatrixRef.current = m.slice();
+        graph.setAutoPaint(true);
+        graph.paint();
+        requestAnimationFrame(() => {
+          clearHighlight();
+          setHighlightedNodeId(e.item._cfg.id);
+        });
       }
     });
     return () => {
