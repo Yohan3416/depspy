@@ -17,19 +17,93 @@ export class webpackPluginDepSpy {
     process.env[DEP_SPY_WEBPACK_BUILD] = "true";
 
     compiler.hooks.beforeRun.tapPromise("EntryPathPlugin", async (compiler) => {
-      // 如果用户没有提供entry，由webpack解析到的第一个entry作为入口
+      // 入口路径标准化函数
+      const normalizeEntry = (e: string) =>
+        path.isAbsolute(e) ? e : path.resolve(compiler.context, e);
+
+      // 如果用户没有提供entry，由webpack解析到的entry作为入口
       if (!this.options.entry) {
         const entry = compiler.options.entry;
         if (typeof entry === "string") {
-          this.options.entry = path.resolve(compiler.context, entry);
+          this.options.entry = normalizeEntry(entry);
         } else if (entry && typeof entry === "object") {
-          const entryStr = Object.values(entry)[0]["import"][0];
-          if (path.isAbsolute(entryStr)) {
-            this.options.entry = entryStr;
-          } else {
-            this.options.entry = path.resolve(compiler.context, entryStr);
-          }
+          // 处理多入口情况
+          const entries: string[] = [];
+
+          // 将入口对象转换为数组
+          const toArray = (v: unknown): string[] => {
+            if (!v) return [];
+            if (typeof v === "string") return [v];
+            if (Array.isArray(v)) return v as string[];
+            if (typeof v === "object") {
+              const obj = v as Record<string, unknown>;
+              return Object.values(obj).flatMap((value) => {
+                if (typeof value === "string") return [value];
+                if (Array.isArray(value)) return value as string[];
+                if (typeof value === "object" && value && "import" in value) {
+                  return Array.isArray((value as { import: unknown }).import)
+                    ? (value as { import: string[] }).import
+                    : [];
+                }
+                return [];
+              });
+            }
+            return [];
+          };
+
+          const entryArray = toArray(entry);
+          entries.push(...entryArray.map(normalizeEntry));
+
+          // 去重并设置入口
+          this.options.entry = Array.isArray(this.options.entry)
+            ? Array.from(new Set([...this.options.entry, ...entries]))
+            : entries.length > 0
+              ? entries
+              : normalizeEntry("index.js");
         }
+      } else {
+        // 如果用户提供了entry，也需要标准化处理
+        const normalizeUserEntry = (e: unknown): string[] => {
+          if (typeof e === "string") return [normalizeEntry(e)];
+          if (Array.isArray(e)) return e.map(normalizeEntry);
+          return [];
+        };
+
+        const normalizedEntries = normalizeUserEntry(this.options.entry);
+        this.options.entry = Array.from(new Set(normalizedEntries));
+      }
+
+      // 设置 node_modules 为 external，避免额外构建第三方依赖
+      if (this.options.ignoreThirdParty) {
+        const existingExternal = compiler.options.externals || [];
+        const externalArray = Array.isArray(existingExternal)
+          ? existingExternal
+          : [existingExternal];
+
+        const nodeModulesExternal = (
+          context: string,
+          request: string,
+          callback: (err?: Error | null, result?: string) => void,
+        ) => {
+          const isNodeModules = request.includes("node_modules");
+          const matchesExistingExternal = externalArray.some((ext: unknown) => {
+            if (typeof ext === "function") {
+              return ext(context, request, callback);
+            } else if (typeof ext === "string") {
+              return request.includes(ext);
+            } else if (ext instanceof RegExp) {
+              return ext.test(request);
+            }
+            return false;
+          });
+
+          if (isNodeModules || matchesExistingExternal) {
+            return callback(null, `commonjs ${request}`);
+          }
+          return callback();
+        };
+
+        compiler.options.externals = nodeModulesExternal;
       }
     });
     compiler.hooks.compilation.tap("DependencyTreePlugin", (compilation) => {
