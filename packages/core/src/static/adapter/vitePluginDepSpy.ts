@@ -10,9 +10,7 @@ import { OutputBundle } from "rollup";
 import { GetModuleInfo, PluginDepSpyConfig } from "../../type";
 import { StaticGraph } from "../staticGraph";
 
-export function vitePluginDepSpy(
-  options: PluginDepSpyConfig = { ignoreThirdParty: true },
-): PluginOption {
+export function vitePluginDepSpy(options: PluginDepSpyConfig): PluginOption {
   //只能通过ds命令运行;
   if (!process.env[DEP_SPY_START]) {
     return false;

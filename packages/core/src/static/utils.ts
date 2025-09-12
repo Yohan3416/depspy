@@ -425,6 +425,7 @@ export function isPathNeedFilter(
 export function mergeOptions(options: PluginDepSpyConfig): PluginDepSpyConfig {
   return {
     commitHash: process.env[DEP_SPY_COMMIT_HASH],
+    ignoreThirdParty: true,
     ...options,
   };
 }
