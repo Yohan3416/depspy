@@ -11,7 +11,7 @@ import Icon, {
   FolderOutlined,
 } from "@ant-design/icons";
 import { icons } from "./icons";
-
+import "./index.scss";
 export const Global = () => {
   // const [activeTab, setActiveTab] = useState<"git" | "import">("git");
   const { gitChangedNodes, importChangedNodes, activeTab, setActiveTab } =
