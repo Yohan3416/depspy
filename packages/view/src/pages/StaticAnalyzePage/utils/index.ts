@@ -205,7 +205,7 @@ export function renderTreeByGraphId(
   const staticTree = _buildTreeByGraphId(entryId, staticGraph, reverse);
   useStaticStore.setState((s) => ({
     staticRoot: staticTree,
-    staticRootVersion: (s as any).staticRootVersion + 1,
+    staticRootVersion: s.staticRootVersion + 1,
   }));
 }
 

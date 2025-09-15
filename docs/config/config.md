@@ -49,10 +49,12 @@ ds --depth 3 --graph my-graph.json
 ```ts
 export interface PluginDepSpyConfig {
   // 项目的入口，默认为index.html
-  entry?: string;
+  entry?: string | string[];
   // 忽略的文件路径，正则用test，字符串用includes
   ignores?: (string | RegExp)[];
   // 对比版本的commit hash
   commitHash?: string;
+  // 是否在构建内部依赖图的时候忽略第三方依赖,默认为true
+  ignoreThirdParty?: boolean;
 }
 ```
